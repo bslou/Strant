@@ -10,7 +10,7 @@ class CalcLexer(Lexer):
         self.index += 1
     # Set of token names.   This is always required
     #add LPAREN and RPAREN in the future
-    tokens = { QUOTE, COUNT, TYPE, INSTANCE, MIEQ, TIEQ, DIEQ, ROUNDUP, ROUNDDOWN, PLEQ, FIND, ASK, FLOAT, NAME, IF, ELF, ELSE, FUN, CLASS, TRUE, FALSE, WHILE, SHOW, FOR, TO, NUMBER, PLUS, MINUS, TIMES,
+    tokens = { SHOWLN, QUOTE, COUNT, TYPE, INSTANCE, MIEQ, TIEQ, DIEQ, ROUNDUP, ROUNDDOWN, PLEQ, FIND, ASK, FLOAT, NAME, IF, ELF, ELSE, FUN, CLASS, TRUE, FALSE, WHILE, SHOW, FOR, TO, NUMBER, PLUS, MINUS, TIMES,
                DIVIDE, MOD, EQ, ASSIGN, LE, LT, GE, GT, NE, OR, AND, ARROW, NAME, STRING, THEN }
 
     # String containing ignored characters between tokens
@@ -21,6 +21,7 @@ class CalcLexer(Lexer):
     literals = {'(', ')', ',', ';', '{', '}', ':', '[', ']', '^'}
 
     # Regular expression rules for tokens
+    SHOWLN = r'showln'
     COUNT = r'count'
     TYPE = r'type'
     ROUNDUP = r'roundUp'
@@ -38,21 +39,23 @@ class CalcLexer(Lexer):
     CLASS = r'class'
     ARROW = r'->'
     THEN = r'then'
-    NAME = r'[a-zA-Z_][a-zA-Z0-9_]*'
-    STRING = r'\'.*?\''
     TRUE = r'true'
     FALSE = r'false'
+    NAME = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    STRING = r'\'.*?\''
+    
     PLEQ = r'\+='
     MIEQ = r'-='
     TIEQ = r'\*='
     DIEQ = r'/='
-    QUOTE = '\"'
+    QUOTE = r'\"'
+    
 
     
     
-    
+    FLOAT = r'[+-]?[0-9]+\.[0-9]+'
     NUMBER  = r'\d+'
-    FLOAT = r'\d+.\d+'
+    
     PLUS    = r'\+'
     MINUS   = r'-'
     TIMES   = r'\*'
@@ -76,8 +79,7 @@ class CalcLexer(Lexer):
 
    
 
-
-    @_(r'\d+.\d+')
+    @_(r'[+-]?[0-9]+\.[0-9]+')
     def FLOAT(self, t):
         t.value = float(t.value)   # Convert to a numeric value
         return t
@@ -92,6 +94,8 @@ class CalcLexer(Lexer):
     @_(r'@.*')
     def COMMENT(self, t):
         pass
+
+    
 
 
 
@@ -127,6 +131,10 @@ class CalcParser(Parser):
     def expr(self, p):
         return type(p.expr)
     
+    @_('FLOAT')
+    def expr(self, p):
+        return p.FLOAT
+
     
     @_('NUMBER')
     def expr(self, p):
@@ -137,13 +145,10 @@ class CalcParser(Parser):
         return p.STRING[1:-1]
 
     @_('COUNT "(" expr ")" ')
-    def statement(self, p):
+    def expr(self, p):
         return len(p.expr)
 
-    @_('FLOAT')
-    def expr(self, p):
-        return p.FLOAT
-
+    
     @_('TRUE')
     def expr(self, p):
         return True
@@ -180,11 +185,11 @@ class CalcParser(Parser):
 
     @_('ROUNDUP "(" expr ")" ')
     def expr(self, p):
-        return math.ceil(expr)
+        return math.ceil(p.expr)
 
     @_('ROUNDDOWN "(" expr ")" ')
     def expr(self, p):
-        return math.floor(expr)
+        return math.floor(p.expr)
 
     @_('expr')
     def statement(self, p):
@@ -209,6 +214,7 @@ class CalcParser(Parser):
     @_('NAME ASSIGN expr')
     def statement(self, p):
         self.names[p.NAME] = p.expr
+        
         
     @_('expr PLUS expr')
     def expr(self, p):
@@ -245,12 +251,11 @@ class CalcParser(Parser):
 
     @_('ASK')
     def expr(self, p):
-        input()
+        return input()
 
     @_('ASK')
     def statement(self, p):
-        input()
-
+        return input()
 
     @_('expr LT expr')
     def expr(self, p):
@@ -279,7 +284,7 @@ class CalcParser(Parser):
     @_('expr AND expr')
     def expr(self, p):
         return p.expr0 and p.expr1
-
+    
 
     @_('expr LT expr')
     def condition(self, p):
@@ -309,12 +314,12 @@ class CalcParser(Parser):
     def condition(self, p):
         return p.expr0 and p.expr1
 
-    @_('expr "[" NUMBER ":" NUMBER "]"')
+    @_('expr "[" expr ":" expr "]"')
     def statement(self, p):
         o = ''
-        one = p.NUMBER0
-        two = p.NUMBER1
-        n = p.expr   
+        one = p.expr1
+        two = p.expr2
+        n = p.expr0  
         for i in range(one, two):
             o += n[i]
         print(o)
@@ -342,6 +347,25 @@ class CalcParser(Parser):
             print("Undefined name '%s'" % p.NAME)
             return 0
 
+    @_('SHOWLN "(" STRING ")" ')
+    def expr(self, p):
+        return p.STRING + '\n'
+
+    
+
+    @_('SHOWLN "(" NAME ")" ')
+    def expr(self, p):
+        try:
+            print( "{} \n".format(self.names[p.NAME]) )
+            return
+        except LookupError:
+            print("Undefined name '%s'" % p.NAME)
+            return 0
+
+    @_('SHOWLN "(" statement ")" ')
+    def expr(self, p):
+        return "{} \n".format(p.statement)
+
     @_('expr FIND "(" expr ")" ')
     def statement(self, p):
         o = p.expr0[1:-1].find(p.expr1[1:-1])
@@ -352,10 +376,10 @@ class CalcParser(Parser):
         print(p.statement)
 
 
-    @_('expr "[" NUMBER "]" ')
+    @_('expr "[" expr "]" ')
     def statement(self, p):
-        o = p.expr
-        print(o[p.NUMBER])
+        o = p.expr0
+        print(o[p.expr1])
         return o
 
     @_('expr "^" expr')
@@ -363,9 +387,6 @@ class CalcParser(Parser):
         o = p.expr0 ** p.expr1
         return o
 
-    
-            
-    
     @_('NAME')
     def expr(self, p):
         try:
