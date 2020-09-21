@@ -182,6 +182,10 @@ class CalcParser(Parser):
     @_('IF "(" condition ")" "{" statement "}" ')
     def statement(self, p):
         return ('if_stmt', p.condition, ('branch', p.statement))
+    
+    @_('WHILE "(" condition ")" "{" statement "}" ')
+    def condition(self, p):
+        pass 
 
     @_('ROUNDUP "(" expr ")" ')
     def expr(self, p):
@@ -322,16 +326,11 @@ class CalcParser(Parser):
         n = p.expr0  
         for i in range(one, two):
             o += n[i]
-        print(o)
-   
-    
-    @_('WHILE "(" condition ")" "{" statement "}" ')
-    def condition(self, p):
-        pass 
+        print(o)    
 
     @_('CLASS NAME ":" statement')
     def statement(self, p):
-        pass
+        return p.NAME
 
     
     @_('SHOW "(" STRING ")" ')
@@ -349,7 +348,7 @@ class CalcParser(Parser):
 
     @_('SHOWLN "(" STRING ")" ')
     def expr(self, p):
-        return p.STRING + '\n'
+        return p.STRING[1:-1] + '\n'
 
     
 
